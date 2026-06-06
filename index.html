@@ -359,6 +359,8 @@
     function getDefaultFourYear() {
         const result = [];
         for (let name of fourYearSemesters) result.push({ id: name, name, expenses: [] });
+        
+        // Fall 2025 (Freshman)
         result[0].expenses = [
             { desc: "15 Creditos", amount: 16549, parent: "pai", status: "paid", comment: "" },
             { desc: "Moradia Honors", amount: 4800, parent: "pai", status: "paid", comment: "" },
@@ -366,15 +368,46 @@
             { desc: "Mesada", amount: 250, parent: "mae", status: "paid", comment: "" },
             { desc: "Outros", amount: 581, parent: "mae", status: "paid", comment: "" }
         ];
+        
+        // Spring 2026 (Freshman)
         result[1].expenses = [
             { desc: "17 Creditos", amount: 18751, parent: "pai", status: "paid", comment: "" },
             { desc: "Moradia Honors", amount: 4800, parent: "pai", status: "paid", comment: "" },
             { desc: "Mesada", amount: 100, parent: "mae", status: "paid", comment: "" },
             { desc: "Outros", amount: 150, parent: "mae", status: "paid", comment: "" }
         ];
-        for (let i = 2; i < result.length; i++) {
-            result[i].expenses = [{ desc: "Tuition & Housing", amount: 20000, parent: "pai", status: "pending", comment: "estimate" }];
+        
+        // Summer 2026
+        result[2].expenses = [
+            { desc: "Tuition & Housing", amount: 20000, parent: "pai", status: "pending", comment: "estimate" }
+        ];
+        
+        // Fall 2026 (Sophomore) - Template for copying
+        const fall2026Template = [
+            { desc: "15 Creditos", amount: 16549, parent: "pai", status: "pending", comment: "" },
+            { desc: "Moradia K.Sig", amount: 2950, parent: "pai", status: "pending", comment: "" },
+            { desc: "K Sig. (Meal+ Member)", amount: 2855, parent: "pai", status: "pending", comment: "" },
+            { desc: "Mercado P. Comida", amount: 1700, parent: "pai", status: "pending", comment: "" },
+            { desc: "Health Insu.", amount: 1500, parent: "pai", status: "pending", comment: "" },
+            { desc: "Ticket Ago-Dez", amount: 1100, parent: "mae", status: "paid", comment: "" },
+            { desc: "Mesada", amount: 1000, parent: "pai", status: "pending", comment: "" },
+            { desc: "Student Edge + AI", amount: 305, parent: "pai", status: "pending", comment: "" },
+            { desc: "Bonus GPA", amount: 250, parent: "pai", status: "pending", comment: "" },
+            { desc: "Comida Fora", amount: 236, parent: "pai", status: "pending", comment: "" },
+            { desc: "Lavanderia, Barbeiro (3x Sem, Celular ano, Livros", amount: 188, parent: "pai", status: "pending", comment: "" },
+            { desc: "Compras/Farmacia", amount: 165, parent: "pai", status: "pending", comment: "" },
+            { desc: "Compras pro Dorm na Frat", amount: 125, parent: "mae", status: "paid", comment: "" },
+            { desc: "Uber", amount: 30, parent: "pai", status: "pending", comment: "" }
+        ];
+        
+        // Copy Fall 2026 template to result[3] (Fall 2026 itself)
+        result[3].expenses = JSON.parse(JSON.stringify(fall2026Template));
+        
+        // Copy Fall 2026 template to Spring 2027 onwards
+        for (let i = 4; i < result.length; i++) {
+            result[i].expenses = JSON.parse(JSON.stringify(fall2026Template));
         }
+        
         return result;
     }
 
