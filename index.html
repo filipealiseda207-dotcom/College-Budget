@@ -29,6 +29,7 @@
         .status-msg { padding: 0.5rem; border-radius: 1rem; margin-top: 0.5rem; font-size: 0.8rem; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
 
         .four-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
         .chart-card { background: white; border-radius: 1rem; padding: 0.6rem; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
@@ -39,7 +40,9 @@
         .simulator-control input { width: 100%; padding: 0.3rem; border-radius: 1rem; border: 1px solid #ccc; }
 
         .semester-section, .current-section { background: white; border-radius: 1.5rem; margin-bottom: 1.5rem; overflow-x: auto; }
-        .section-header { background: #f8fafd; padding: 0.8rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+        .section-header { background: #f8fafd; padding: 0.8rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .section-header-left { display: flex; gap: 0.5rem; align-items: center; }
+        .section-header-right { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         th, td { padding: 0.6rem 0.5rem; text-align: left; border-bottom: 1px solid #ecf3f8; }
         .editable-value { background: #fef3d6; border-radius: 1rem; padding: 0.2rem 0.5rem; display: inline-block; cursor: pointer; }
@@ -66,6 +69,7 @@
             .setup-card { grid-template-columns: 1fr; }
             .four-charts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
             .sync-indicator { top: 10px; right: 10px; font-size: 0.65rem; padding: 0.4rem 0.8rem; }
+            .section-header { flex-direction: column; align-items: flex-start; }
         }
     </style>
 </head>
@@ -108,11 +112,11 @@
 
     <div class="current-section">
         <div class="section-header">
-            <strong>📌 CURRENT SEMESTER</strong>
-            <span><span id="currentSemesterName">Current</span> <button id="editSemesterNameBtn">✏️</button></span>
+            <div class="section-header-left"><strong>📌 CURRENT SEMESTER</strong></div>
+            <div class="section-header-right"><span id="currentSemesterName">Current</span> <button id="editSemesterNameBtn">✏️</button></div>
         </div>
         <table id="currentTable"><thead><tr><th>Expense</th><th>Parent</th><th>Amt</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody id="currentTbody"><tr><td colspan="6">Loading...</td></tr></tbody></table>
-        <div class="add-row" id="addCurrentBtn">+ Add</div>
+        <div class="add-row" id="addCurrentBtn">+ Add expense</div>
         <div style="margin:0.5rem;"><button id="clearCurrentBtn" style="background:#b16254;">🗑️ Clear</button></div>
     </div>
 
@@ -122,7 +126,7 @@
         <button id="exportBtn">📎 Export CSV</button>
         <button id="resetDefaultBtn">⟳ Reset 4‑year</button>
     </div>
-    <footer>💡 Changes sync instantly across all your devices. Click text to edit.</footer>
+    <footer>💡 Click text to edit. Changes sync instantly across all your devices. Add expenses to any semester.</footer>
 </div>
 
 <script>
@@ -136,11 +140,10 @@
     let currentSemester = { name: "📌 Current Semester", expenses: [] };
     let simActive = false, simAdjust = 0;
     let charts = {};
-    let requestCache = new Map();
     let syncTimeout = null;
-    let lastSyncTime = 0;
     let pollInterval = null;
     let lastRemoteHash = null;
+    let isLoading = false;
 
     function updateSyncIndicator(status = 'ready', message = null) {
         const indicator = document.getElementById('syncIndicator');
@@ -151,10 +154,10 @@
             indicator.textContent = '🔄 Syncing...';
         } else if (status === 'error') {
             indicator.className = 'sync-indicator error';
-            indicator.textContent = '❌ Sync error';
+            indicator.textContent = '❌ Error';
             setTimeout(() => updateSyncIndicator('ready'), 3000);
         } else if (status === 'success') {
-            indicator.textContent = '✅ Updated';
+            indicator.textContent = '✅ Synced';
             setTimeout(() => updateSyncIndicator('ready'), 2000);
         } else {
             indicator.textContent = '✅ Ready';
@@ -167,32 +170,40 @@
 
     async function debouncedSync() {
         clearTimeout(syncTimeout);
-        syncTimeout = setTimeout(() => syncToCloud(), 500);
+        syncTimeout = setTimeout(() => syncToCloud(), 800);
     }
 
     async function airtableRequest(method, endpoint, body = null) {
-        const cacheKey = method === 'GET' ? `${method}:${endpoint}` : null;
-        if (cacheKey && requestCache.has(cacheKey)) {
-            return requestCache.get(cacheKey);
-        }
         const url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE}${endpoint ? '/' + endpoint : ''}`;
-        const options = { method, headers: { Authorization: `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' } };
+        const options = { 
+            method, 
+            headers: { 
+                Authorization: `Bearer ${ACCESS_TOKEN}`, 
+                'Content-Type': 'application/json' 
+            }
+        };
         if (body) options.body = JSON.stringify(body);
+        
         const res = await fetch(url, options);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (cacheKey) requestCache.set(cacheKey, data);
-        return data;
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+        return res.json();
     }
 
     async function fetchAllRecords() {
-        const data = await airtableRequest('GET', '?sort%5B0%5D%5Bfield%5D=Semester');
-        return data.records || [];
+        try {
+            const data = await airtableRequest('GET', '?sort%5B0%5D%5Bfield%5D=Semester&pageSize=100');
+            return data.records || [];
+        } catch (err) {
+            console.error('Fetch error:', err);
+            return [];
+        }
     }
 
     async function upsertRecord(recordId, fields) {
-        requestCache.clear();
-        if (recordId) {
+        if (recordId && recordId.startsWith('rec')) {
             return await airtableRequest('PATCH', '', { records: [{ id: recordId, fields }] });
         } else {
             return await airtableRequest('POST', '', { records: [{ fields }] });
@@ -200,7 +211,6 @@
     }
 
     async function deleteRecord(recordId) {
-        requestCache.clear();
         await airtableRequest('DELETE', recordId);
     }
 
@@ -259,6 +269,7 @@
             for (let exp of currentSemester.expenses) {
                 all.push({ ...exp, semester: currentSemester.name, type: 'current' });
             }
+            
             const existing = await fetchAllRecords();
             const existingMap = new Map();
             for (let rec of existing) existingMap.set(rec.id, rec);
@@ -280,11 +291,12 @@
                     if (result?.records?.[0]) exp.id = result.records[0].id;
                 }
             }
+            
             const currentIds = new Set(all.map(e => e.id).filter(id => id?.startsWith('rec')));
             for (let rec of existing) {
                 if (!currentIds.has(rec.id)) await deleteRecord(rec.id);
             }
-            lastSyncTime = Date.now();
+            
             lastRemoteHash = computeDataHash({ fourYearData, currentSemester });
             updateSyncIndicator('success');
         } catch (err) {
@@ -293,15 +305,15 @@
         }
     }
 
-    // Poll for remote changes every 3 seconds
     async function pollForRemoteChanges() {
-        if (!ACCESS_TOKEN || !BASE_ID) return;
+        if (!ACCESS_TOKEN || !BASE_ID || isLoading) return;
         try {
             const records = await fetchAllRecords();
+            if (records.length === 0) return;
+            
             const newData = recordsToData(records);
             const currentHash = computeDataHash({ fourYearData: newData, currentSemester });
             
-            // Only update if remote data differs from current
             if (lastRemoteHash && lastRemoteHash !== currentHash) {
                 fourYearData = newData;
                 renderFourYear();
@@ -317,9 +329,11 @@
 
     async function loadData() {
         if (!ACCESS_TOKEN || !BASE_ID) return false;
+        isLoading = true;
         try {
             const records = await fetchAllRecords();
             if (records.length === 0) {
+                console.log('No records found, seeding defaults');
                 await seedDefaultData();
                 const newRecords = await fetchAllRecords();
                 fourYearData = recordsToData(newRecords);
@@ -329,13 +343,14 @@
             
             lastRemoteHash = computeDataHash({ fourYearData, currentSemester });
             
-            // Start polling for remote changes
             if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(pollForRemoteChanges, 3000);
+            pollInterval = setInterval(pollForRemoteChanges, 2000);
             
+            isLoading = false;
             return true;
         } catch (err) {
-            console.error(err);
+            console.error('Load error:', err);
+            isLoading = false;
             document.getElementById('statusMsg').innerHTML = `<span class="error">❌ Error: ${err.message}</span>`;
             return false;
         }
@@ -448,13 +463,12 @@
         const container = document.getElementById('fourYearContainer');
         container.innerHTML = '';
         for (let sem of fourYearData) {
-            if (sem.expenses.length === 0) continue;
             const div = document.createElement('div');
             div.className = 'semester-section';
             let semTotal = sem.expenses.reduce((s,e)=>s+e.amount,0);
             let semPai = sem.expenses.filter(e=>e.parent==='pai').reduce((s,e)=>s+e.amount,0);
             let semMae = sem.expenses.filter(e=>e.parent==='mae').reduce((s,e)=>s+e.amount,0);
-            div.innerHTML = `<div class="section-header"><strong>${escapeHtml(sem.name)}</strong><span>👨 $${formatUSD(semPai)} | 👩 $${formatUSD(semMae)} | 📆 $${formatUSD(semTotal)}</span></div><div class="table-wrapper"><table><thead><tr><th>Expense</th><th>Parent</th><th>Amount</th><th>Status</th><th>Comment</th><th></th></tr></thead><tbody id="tbody-${sem.id.replace(/[^a-z0-9]/gi,'_')}"></tbody></table></div>`;
+            div.innerHTML = `<div class="section-header"><div class="section-header-left"><strong>${escapeHtml(sem.name)}</strong></div><div class="section-header-right"><span>👨 $${formatUSD(semPai)} | 👩 $${formatUSD(semMae)} | 📆 $${formatUSD(semTotal)}</span></div></div><div class="table-wrapper"><table><thead><tr><th>Expense</th><th>Parent</th><th>Amount</th><th>Status</th><th>Comment</th><th></th></tr></thead><tbody id="tbody-${sem.id.replace(/[^a-z0-9]/gi,'_')}"></tbody></table></div><div class="add-row" onclick="addFourYearExpense('${sem.id}')">+ Add expense</div>`;
             container.appendChild(div);
             const tbody = div.querySelector('tbody');
             for (let i=0; i<sem.expenses.length; i++) {
@@ -508,6 +522,7 @@
     window.cycleFourYearStatus = async (semId, idx) => { let sem = fourYearData.find(s=>s.id===semId); if(sem){ let c = sem.expenses[idx].status; sem.expenses[idx].status = c==='paid'?'partial':(c==='partial'?'pending':'paid'); await syncAndRender(); } };
     window.editFourYearComment = async (semId, idx) => { let sem = fourYearData.find(s=>s.id===semId); if(sem){ let v = prompt('Comment:', sem.expenses[idx].comment||''); if(v!==null){ sem.expenses[idx].comment = v.trim(); await syncAndRender(); } } };
     async function deleteFourYearExpense(semId, idx) { if(confirm('Delete?')){ let sem = fourYearData.find(s=>s.id===semId); sem.expenses.splice(idx,1); await syncAndRender(); } }
+    window.addFourYearExpense = async (semId) => { let desc = prompt('Expense name:'); if(!desc) return; let amt = parseFloat(prompt('Amount:')); if(isNaN(amt)) return; let parent = prompt('Responsible (pai/mae):').toLowerCase(); if(parent!=='pai' && parent!=='mae') return; let comment = prompt('Comment:', ''); let sem = fourYearData.find(s=>s.id===semId); sem.expenses.push({ desc, amount: amt, parent, status: 'pending', comment: comment||'' }); sem.expenses.sort((a,b)=>b.amount - a.amount); await syncAndRender(); }
 
     window.editCurrentDesc = async (idx) => { let v = prompt('Edit:', currentSemester.expenses[idx].desc); if(v && v.trim()){ currentSemester.expenses[idx].desc = v.trim(); await syncAndRender(); } };
     window.toggleCurrentParent = async (idx) => { currentSemester.expenses[idx].parent = currentSemester.expenses[idx].parent==='pai'?'mae':'pai'; await syncAndRender(); };
@@ -531,28 +546,38 @@
     async function testConnection() {
         const token = document.getElementById('tokenInput').value.trim();
         const baseId = document.getElementById('baseIdInput').value.trim();
-        if (!token || !baseId) { alert('Enter both'); return; }
-        document.getElementById('statusMsg').innerHTML = '<span>Testing...</span>';
+        if (!token || !baseId) { alert('Enter both Token and Base ID'); return; }
+        document.getElementById('statusMsg').innerHTML = '<span class="warning">Testing...</span>';
         try {
             const res = await fetch(`https://api.airtable.com/v0/${baseId}/${TABLE}?maxRecords=1`, { headers: { Authorization: `Bearer ${token}` } });
-            document.getElementById('statusMsg').innerHTML = res.ok ? '<span class="success">✅ Success!</span>' : `<span class="error">❌ ${res.status}</span>`;
-        } catch(e) { document.getElementById('statusMsg').innerHTML = `<span class="error">❌ ${e.message}</span>`; }
+            if (res.ok) {
+                document.getElementById('statusMsg').innerHTML = '<span class="success">✅ Success! Click "Save & Load"</span>';
+            } else {
+                const errorText = await res.text();
+                document.getElementById('statusMsg').innerHTML = `<span class="error">❌ ${res.status}: ${errorText}</span>`;
+            }
+        } catch(e) { 
+            document.getElementById('statusMsg').innerHTML = `<span class="error">❌ ${e.message}</span>`; 
+        }
     }
 
     async function saveAndLoad() {
         const token = document.getElementById('tokenInput').value.trim();
         const baseId = document.getElementById('baseIdInput').value.trim();
-        if (!token || !baseId) { alert('Enter both'); return; }
+        if (!token || !baseId) { alert('Please enter both Token and Base ID'); return; }
         localStorage.setItem('airtable_token', token);
         localStorage.setItem('airtable_base_id', baseId);
-        ACCESS_TOKEN = token; BASE_ID = baseId;
-        document.getElementById('statusMsg').innerHTML = '<span>Loading...</span>';
+        ACCESS_TOKEN = token; 
+        BASE_ID = baseId;
+        document.getElementById('statusMsg').innerHTML = '<span class="warning">Loading...</span>';
         const success = await loadData();
         if (success) {
-            document.getElementById('statusMsg').innerHTML = '<span class="success">✅ Loaded! Real-time sync active.</span>';
-            renderFourYear(); renderCurrent(); updateTotalsUI();
+            document.getElementById('statusMsg').innerHTML = '<span class="success">✅ Loaded! Real-time sync active. Polling every 2 seconds.</span>';
+            renderFourYear(); 
+            renderCurrent(); 
+            updateTotalsUI();
         } else {
-            document.getElementById('statusMsg').innerHTML = '<span class="error">❌ Failed.</span>';
+            document.getElementById('statusMsg').innerHTML = '<span class="error">❌ Failed to load. Check your credentials.</span>';
         }
     }
 
@@ -560,11 +585,10 @@
     document.getElementById('testBtn').addEventListener('click', testConnection);
     document.getElementById('addCurrentBtn').addEventListener('click', async () => { let desc = prompt('Name:'); if(desc) { let amt = parseFloat(prompt('Amount:')); if(!isNaN(amt)) { let parent = prompt('pai/mae?').toLowerCase(); if(parent==='pai' || parent==='mae') { currentSemester.expenses.push({ desc, amount: amt, parent, status: 'pending', comment: '' }); await syncAndRender(); } } } });
     document.getElementById('editSemesterNameBtn').addEventListener('click', async () => { let newName = prompt('Name:', currentSemester.name); if(newName) { currentSemester.name = newName.trim(); await syncAndRender(); } });
-    document.getElementById('clearCurrentBtn').addEventListener('click', async () => { if(confirm('Clear?')) { currentSemester.expenses = []; await syncAndRender(); } });
+    document.getElementById('clearCurrentBtn').addEventListener('click', async () => { if(confirm('Clear all?')) { currentSemester.expenses = []; await syncAndRender(); } });
     document.getElementById('exportBtn').addEventListener('click', exportCSV);
-    document.getElementById('resetDefaultBtn').addEventListener('click', async () => { if(confirm('Reset?')) { fourYearData = getDefaultFourYear(); await syncAndRender(); } });
+    document.getElementById('resetDefaultBtn').addEventListener('click', async () => { if(confirm('Reset 4-year?')) { fourYearData = getDefaultFourYear(); await syncAndRender(); } });
 
-    // Listen for tab focus to refresh
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) pollForRemoteChanges();
     });
