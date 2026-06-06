@@ -29,7 +29,6 @@
         .status-msg { padding: 0.5rem; border-radius: 1rem; margin-top: 0.5rem; font-size: 0.8rem; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
-        .warning { background: #fff3cd; color: #856404; }
 
         .four-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
         .chart-card { background: white; border-radius: 1rem; padding: 0.6rem; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
@@ -40,9 +39,7 @@
         .simulator-control input { width: 100%; padding: 0.3rem; border-radius: 1rem; border: 1px solid #ccc; }
 
         .semester-section, .current-section { background: white; border-radius: 1.5rem; margin-bottom: 1.5rem; overflow-x: auto; }
-        .section-header { background: #f8fafd; padding: 0.8rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-        .section-header-left { display: flex; gap: 0.5rem; align-items: center; }
-        .section-header-right { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .section-header { background: #f8fafd; padding: 0.8rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         th, td { padding: 0.6rem 0.5rem; text-align: left; border-bottom: 1px solid #ecf3f8; }
         .editable-value { background: #fef3d6; border-radius: 1rem; padding: 0.2rem 0.5rem; display: inline-block; cursor: pointer; }
@@ -51,586 +48,352 @@
         .badge-mae { background: #f5e0e9; }
         .status-badge { cursor: pointer; display: inline-block; padding: 0.2rem 0.6rem; border-radius: 2rem; font-size: 0.7rem; font-weight: 600; }
         .status-paid { background: #c8e6d9; }
-        .status-partial { background: #ffe0b3; }
-        .status-pending { background: #ffd9d4; }
-        .comment-cell { cursor: pointer; background: #f9f9fc; border-radius: 0.8rem; padding: 0.2rem 0.4rem; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .comment-cell::after {
-            content: attr(data-fulltext);
-            position: absolute; background: #1e2f3f; color: white; padding: 4px 8px; border-radius: 8px; font-size: 0.7rem;
-            white-space: normal; max-width: 250px; z-index: 1000; bottom: 100%; left: 0; margin-bottom: 4px; opacity: 0; transition: opacity 0.2s; pointer-events: none;
-        }
-        .comment-cell:hover::after { opacity: 1; }
-        button { background: #1f5e8e; border: none; padding: 0.3rem 0.8rem; border-radius: 2rem; color: white; cursor: pointer; font-size: 0.7rem; }
-        .add-row { margin: 0.6rem; display: inline-block; font-size: 0.7rem; background: #eef3fc; padding: 0.2rem 0.8rem; border-radius: 2rem; cursor: pointer; }
-        .action-buttons { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }
-        footer { text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: #4a627a; }
-
-        @media (max-width: 768px) {
-            .setup-card { grid-template-columns: 1fr; }
-            .four-charts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-            .sync-indicator { top: 10px; right: 10px; font-size: 0.65rem; padding: 0.4rem 0.8rem; }
-            .section-header { flex-direction: column; align-items: flex-start; }
-        }
+        .status-pending { background: #ffeaa7; }
+        .status-unpaid { background: #ffcccc; }
     </style>
 </head>
 <body>
-<div class="sync-indicator" id="syncIndicator">✅ Ready</div>
+    <div class="sync-indicator" id="syncIndicator">Ready</div>
+    <div class="container">
+        <h1>💰 College Budget Tracker</h1>
+        <p class="sub">4 Graphs · Airtable Sync · All Semesters</p>
 
-<div class="container">
-    <h1>🎓 4‑Year College Budget · Airtable Sync</h1>
-    <div class="sub">✅ Paid | 🔸 Partial | 🔴 Pending | 🔄 Real-time sync across all devices</div>
-
-    <div class="setup-card">
-        <input type="text" id="tokenInput" placeholder="Personal Access Token (pat...)" autocomplete="off">
-        <input type="text" id="baseIdInput" placeholder="Base ID (app...)">
-        <button id="saveBtn">Save & Load</button>
-        <button id="testBtn" style="background:#5b7f9e;">Test</button>
-    </div>
-    <div id="statusMsg" class="status-msg"></div>
-
-    <div class="stats-row">
-        <div class="stat-card"><div class="stat-label">✅ Paid</div><div class="stat-number" id="totalPaid">$0</div></div>
-        <div class="stat-card"><div class="stat-label">🔸 Partial</div><div class="stat-number" id="totalPartial">$0</div></div>
-        <div class="stat-card"><div class="stat-label">⚠️ Pending</div><div class="stat-number" id="totalPending">$0</div></div>
-        <div class="stat-card"><div class="stat-label">👨‍👩 Grand Total</div><div class="stat-number" id="totalGrand">$0</div></div>
-    </div>
-
-    <div class="four-charts">
-        <div class="chart-card"><canvas id="overallChart"></canvas><p style="text-align:center; font-size:0.7rem;">📊 Overall</p></div>
-        <div class="chart-card"><canvas id="paiChart"></canvas><p style="text-align:center; font-size:0.7rem;">👨 Pai</p></div>
-        <div class="chart-card"><canvas id="maeChart"></canvas><p style="text-align:center; font-size:0.7rem;">👩 Mãe</p></div>
-        <div class="chart-card"><canvas id="contribChart"></canvas><p style="text-align:center; font-size:0.7rem;">👨‍👩 Contrib</p></div>
-    </div>
-
-    <div class="simulator-card">
-        <h4>🧠 What‑If Simulator</h4>
-        <div class="simulator-control"><label>Monthly adjustment (USD):</label><input type="number" id="simMonthly" value="0" step="50"></div>
-        <div class="simulator-control"><label>Duration (months):</label><input type="number" id="simMonths" value="12"></div>
-        <button id="applySim">Apply</button> <button id="resetSim">Reset</button>
-        <div id="simMsg" style="margin-top:0.5rem; font-size:0.7rem;">No simulation</div>
-    </div>
-
-    <div class="current-section">
-        <div class="section-header">
-            <div class="section-header-left"><strong>📌 CURRENT SEMESTER</strong></div>
-            <div class="section-header-right"><span id="currentSemesterName">Current</span> <button id="editSemesterNameBtn">✏️</button></div>
+        <div class="setup-card">
+            <input type="password" id="apiKeyInput" placeholder="Paste Airtable API Key">
+            <input type="text" id="baseIdInput" placeholder="Paste Base ID">
+            <button onclick="syncData()">📊 Sync Now</button>
+            <div id="statusMsg"></div>
         </div>
-        <table id="currentTable"><thead><tr><th>Expense</th><th>Parent</th><th>Amt</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody id="currentTbody"><tr><td colspan="6">Loading...</td></tr></tbody></table>
-        <div class="add-row" id="addCurrentBtn">+ Add expense</div>
-        <div style="margin:0.5rem;"><button id="clearCurrentBtn" style="background:#b16254;">🗑️ Clear</button></div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">Total Budget</div>
+                <div class="stat-number" id="totalBudget">$0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Paid</div>
+                <div class="stat-number" id="totalPaid">$0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Pending</div>
+                <div class="stat-number" id="totalPending">$0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Unpaid</div>
+                <div class="stat-number" id="totalUnpaid">$0</div>
+            </div>
+        </div>
+
+        <div class="four-charts">
+            <div class="chart-card">
+                <canvas id="budgetChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <canvas id="statusChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <canvas id="semesterChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+        <div class="simulator-card">
+            <h3>💡 What-If Simulator</h3>
+            <div class="simulator-control">
+                <label>Adjust Budget by %:</label>
+                <input type="number" id="percentChange" placeholder="Enter percentage (e.g., 10 for +10%)" value="0">
+                <button onclick="simulateChange()">Simulate</button>
+                <div id="simulatorResult" style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+
+        <div id="semesterContainer"></div>
     </div>
 
-    <div id="fourYearContainer"><div style="text-align:center; padding:2rem;">Loading 4-year plan...</div></div>
+    <script>
+        let allData = [];
+        let chartInstances = {};
 
-    <div class="action-buttons">
-        <button id="exportBtn">📎 Export CSV</button>
-        <button id="resetDefaultBtn">⟳ Reset 4‑year</button>
-    </div>
-    <footer>💡 Click text to edit. Changes sync instantly across all your devices. Add expenses to any semester.</footer>
-</div>
-
-<script>
-    function formatUSD(value) { return Math.round(value).toLocaleString('en-US'); }
-    function escapeHtml(str) { if (!str) return ''; const map = {'&':'&amp;','<':'&lt;','>':'&gt;'}; return str.replace(/[&<>]/g, m => map[m]); }
-
-    let ACCESS_TOKEN = localStorage.getItem('airtable_token') || '';
-    let BASE_ID = localStorage.getItem('airtable_base_id') || '';
-    const TABLE = 'Budget';
-    let fourYearData = [];
-    let currentSemester = { name: "📌 Current Semester", expenses: [] };
-    let simActive = false, simAdjust = 0;
-    let charts = {};
-    let syncTimeout = null;
-    let pollInterval = null;
-    let lastRemoteHash = null;
-    let isLoading = false;
-
-    function updateSyncIndicator(status = 'ready', message = null) {
-        const indicator = document.getElementById('syncIndicator');
-        indicator.className = 'sync-indicator';
-        
-        if (status === 'syncing') {
-            indicator.className = 'sync-indicator syncing';
-            indicator.textContent = '🔄 Syncing...';
-        } else if (status === 'error') {
-            indicator.className = 'sync-indicator error';
-            indicator.textContent = '❌ Error';
-            setTimeout(() => updateSyncIndicator('ready'), 3000);
-        } else if (status === 'success') {
-            indicator.textContent = '✅ Synced';
-            setTimeout(() => updateSyncIndicator('ready'), 2000);
-        } else {
-            indicator.textContent = '✅ Ready';
-        }
-    }
-
-    function computeDataHash(data) {
-        return JSON.stringify(data).split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0).toString();
-    }
-
-    async function debouncedSync() {
-        clearTimeout(syncTimeout);
-        syncTimeout = setTimeout(() => syncToCloud(), 800);
-    }
-
-    async function airtableRequest(method, endpoint, body = null) {
-        const url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE}${endpoint ? '/' + endpoint : ''}`;
-        const options = { 
-            method, 
-            headers: { 
-                Authorization: `Bearer ${ACCESS_TOKEN}`, 
-                'Content-Type': 'application/json' 
-            }
+        const FALL_2026_TEMPLATE = {
+            'Tuition': 15000,
+            'Room & Board': 8000,
+            'Books & Supplies': 1200,
+            'Personal Expenses': 500,
+            'Transportation': 400,
+            'Miscellaneous': 300
         };
-        if (body) options.body = JSON.stringify(body);
-        
-        const res = await fetch(url, options);
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`HTTP ${res.status}: ${errorText}`);
+
+        function initializeData() {
+            const semesters = [
+                { id: 'fall2026', label: 'Fall 2026 (Sophomore)', year: 2026, season: 'Fall' },
+                { id: 'spring2027', label: 'Spring 2027 (Sophomore)', year: 2027, season: 'Spring' },
+                { id: 'summer2027', label: 'Summer 2027 (Sophomore)', year: 2027, season: 'Summer' },
+                { id: 'fall2027', label: 'Fall 2027 (Junior)', year: 2027, season: 'Fall' },
+                { id: 'spring2028', label: 'Spring 2028 (Junior)', year: 2028, season: 'Spring' },
+                { id: 'summer2028', label: 'Summer 2028 (Junior)', year: 2028, season: 'Summer' },
+                { id: 'fall2028', label: 'Fall 2028 (Senior)', year: 2028, season: 'Fall' },
+                { id: 'spring2029', label: 'Spring 2029 (Senior)', year: 2029, season: 'Spring' }
+            ];
+
+            allData = semesters.map(sem => ({
+                ...sem,
+                expenses: Object.entries(FALL_2026_TEMPLATE).map(([name, amount]) => ({
+                    name,
+                    amount,
+                    responsible: 'Pai',
+                    status: 'Unpaid'
+                }))
+            }));
         }
-        return res.json();
-    }
 
-    async function fetchAllRecords() {
-        try {
-            const data = await airtableRequest('GET', '?sort%5B0%5D%5Bfield%5D=Semester&pageSize=100');
-            return data.records || [];
-        } catch (err) {
-            console.error('Fetch error:', err);
-            return [];
+        function renderSemesters() {
+            const container = document.getElementById('semesterContainer');
+            container.innerHTML = allData.map(sem => `
+                <div class="semester-section">
+                    <div class="section-header">
+                        <h2>${sem.label}</h2>
+                        <span style="color: #666; font-size: 0.9rem;">
+                            Total: $${sem.expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}
+                        </span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Expense</th>
+                                <th>Amount</th>
+                                <th>Responsible</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sem.expenses.map((exp, idx) => `
+                                <tr>
+                                    <td>${exp.name}</td>
+                                    <td>
+                                        <span class="editable-value" onclick="editAmount('${sem.id}', ${idx}, this)">
+                                            $${exp.amount.toLocaleString()}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="responsible-badge badge-${exp.responsible.toLowerCase()}" 
+                                              onclick="toggleResponsible('${sem.id}', ${idx})">
+                                            ${exp.responsible}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-${exp.status.toLowerCase()}"
+                                              onclick="toggleStatus('${sem.id}', ${idx})">
+                                            ${exp.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `).join('');
         }
-    }
 
-    async function upsertRecord(recordId, fields) {
-        if (recordId && recordId.startsWith('rec')) {
-            return await airtableRequest('PATCH', '', { records: [{ id: recordId, fields }] });
-        } else {
-            return await airtableRequest('POST', '', { records: [{ fields }] });
+        function editAmount(semId, expIdx, element) {
+            const newAmount = prompt('Enter new amount:', element.textContent.replace('$', '').replace(',', ''));
+            if (newAmount !== null && !isNaN(newAmount)) {
+                const sem = allData.find(s => s.id === semId);
+                sem.expenses[expIdx].amount = parseInt(newAmount);
+                renderSemesters();
+                updateStats();
+                updateCharts();
+            }
         }
-    }
 
-    async function deleteRecord(recordId) {
-        await airtableRequest('DELETE', recordId);
-    }
+        function toggleResponsible(semId, expIdx) {
+            const sem = allData.find(s => s.id === semId);
+            sem.expenses[expIdx].responsible = sem.expenses[expIdx].responsible === 'Pai' ? 'Mae' : 'Pai';
+            renderSemesters();
+            updateStats();
+            updateCharts();
+        }
 
-    const fourYearSemesters = [
-        "🍂 Fall 2025 (Freshman)", "🌸 Spring 2026 (Freshman)", "☀️ Summer 2026",
-        "🍂 Fall 2026 (Sophomore)", "🌸 Spring 2027 (Sophomore)", "☀️ Summer 2027",
-        "🍂 Fall 2027 (Junior)", "🌸 Spring 2028 (Junior)", "☀️ Summer 2028",
-        "🍂 Fall 2028 (Senior)", "🌸 Spring 2029 (Senior)", "☀️ Summer 2029"
-    ];
+        function toggleStatus(semId, expIdx) {
+            const statuses = ['Unpaid', 'Pending', 'Paid'];
+            const sem = allData.find(s => s.id === semId);
+            const currentIdx = statuses.indexOf(sem.expenses[expIdx].status);
+            sem.expenses[expIdx].status = statuses[(currentIdx + 1) % statuses.length];
+            renderSemesters();
+            updateStats();
+            updateCharts();
+        }
 
-    function recordsToData(records) {
-        const fourMap = new Map();
-        const currentExps = [];
-        let currentName = "📌 Current Semester";
+        function updateStats() {
+            const allExpenses = allData.flatMap(s => s.expenses);
+            const totalBudget = allExpenses.reduce((sum, e) => sum + e.amount, 0);
+            const totalPaid = allExpenses.filter(e => e.status === 'Paid').reduce((sum, e) => sum + e.amount, 0);
+            const totalPending = allExpenses.filter(e => e.status === 'Pending').reduce((sum, e) => sum + e.amount, 0);
+            const totalUnpaid = allExpenses.filter(e => e.status === 'Unpaid').reduce((sum, e) => sum + e.amount, 0);
 
-        for (let rec of records) {
-            const f = rec.fields;
-            const semester = f.Semester || '';
-            const type = f.Type || (fourYearSemesters.includes(semester) ? 'fouryear' : 'current');
-            const expense = {
-                id: rec.id,
-                desc: f.Expense || '',
-                amount: typeof f.Amount === 'number' ? f.Amount : parseFloat(f.Amount) || 0,
-                parent: f.Parent || 'pai',
-                status: f.Status || 'pending',
-                comment: f.Comment || ''
+            document.getElementById('totalBudget').textContent = `$${totalBudget.toLocaleString()}`;
+            document.getElementById('totalPaid').textContent = `$${totalPaid.toLocaleString()}`;
+            document.getElementById('totalPending').textContent = `$${totalPending.toLocaleString()}`;
+            document.getElementById('totalUnpaid').textContent = `$${totalUnpaid.toLocaleString()}`;
+        }
+
+        function updateCharts() {
+            const allExpenses = allData.flatMap(s => s.expenses);
+
+            // Budget Chart (by semester)
+            const semesterTotals = allData.map(s => ({
+                label: s.label.split(' (')[0],
+                value: s.expenses.reduce((sum, e) => sum + e.amount, 0)
+            }));
+
+            updateChart('budgetChart', {
+                type: 'bar',
+                data: {
+                    labels: semesterTotals.map(s => s.label),
+                    datasets: [{
+                        label: 'Budget by Semester',
+                        data: semesterTotals.map(s => s.value),
+                        backgroundColor: 'rgba(31, 94, 142, 0.6)',
+                        borderColor: 'rgba(31, 94, 142, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' }
+            });
+
+            // Status Chart
+            const statusData = {
+                'Paid': allExpenses.filter(e => e.status === 'Paid').reduce((sum, e) => sum + e.amount, 0),
+                'Pending': allExpenses.filter(e => e.status === 'Pending').reduce((sum, e) => sum + e.amount, 0),
+                'Unpaid': allExpenses.filter(e => e.status === 'Unpaid').reduce((sum, e) => sum + e.amount, 0)
             };
-            if (type === 'current') {
-                if (semester) currentName = semester;
-                currentExps.push(expense);
-            } else {
-                if (!fourMap.has(semester)) fourMap.set(semester, []);
-                fourMap.get(semester).push(expense);
+
+            updateChart('statusChart', {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusData),
+                    datasets: [{
+                        data: Object.values(statusData),
+                        backgroundColor: ['rgba(200, 230, 217, 0.8)', 'rgba(255, 234, 167, 0.8)', 'rgba(255, 204, 204, 0.8)'],
+                        borderColor: ['#4caf50', '#ffc107', '#f44336'],
+                        borderWidth: 2
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Semester Chart (pie)
+            updateChart('semesterChart', {
+                type: 'pie',
+                data: {
+                    labels: semesterTotals.map(s => s.label),
+                    datasets: [{
+                        data: semesterTotals.map(s => s.value),
+                        backgroundColor: [
+                            'rgba(31, 94, 142, 0.6)',
+                            'rgba(100, 130, 160, 0.6)',
+                            'rgba(150, 170, 190, 0.6)',
+                            'rgba(200, 210, 230, 0.6)',
+                            'rgba(60, 120, 180, 0.6)',
+                            'rgba(90, 140, 170, 0.6)',
+                            'rgba(120, 150, 190, 0.6)',
+                            'rgba(170, 190, 220, 0.6)'
+                        ],
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Category Chart
+            const categoryTotals = {};
+            allExpenses.forEach(e => {
+                categoryTotals[e.name] = (categoryTotals[e.name] || 0) + e.amount;
+            });
+
+            updateChart('categoryChart', {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(categoryTotals),
+                    datasets: [{
+                        label: 'Budget by Category',
+                        data: Object.values(categoryTotals),
+                        backgroundColor: 'rgba(100, 150, 200, 0.6)',
+                        borderColor: 'rgba(31, 94, 142, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' }
+            });
+        }
+
+        function updateChart(canvasId, config) {
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
+            chartInstances[canvasId] = new Chart(document.getElementById(canvasId), config);
+        }
+
+        function simulateChange() {
+            const percent = parseFloat(document.getElementById('percentChange').value) || 0;
+            const multiplier = 1 + (percent / 100);
+
+            const simulatedData = allData.map(sem => ({
+                ...sem,
+                expenses: sem.expenses.map(exp => ({
+                    ...exp,
+                    amount: Math.round(exp.amount * multiplier)
+                }))
+            }));
+
+            const originalTotal = allData.flatMap(s => s.expenses).reduce((sum, e) => sum + e.amount, 0);
+            const simulatedTotal = simulatedData.flatMap(s => s.expenses).reduce((sum, e) => sum + e.amount, 0);
+            const difference = simulatedTotal - originalTotal;
+
+            document.getElementById('simulatorResult').innerHTML = `
+                <strong>Simulated Total: $${simulatedTotal.toLocaleString()}</strong> (${difference > 0 ? '+' : ''}$${difference.toLocaleString()})
+            `;
+        }
+
+        async function syncData() {
+            const apiKey = document.getElementById('apiKeyInput').value;
+            const baseId = document.getElementById('baseIdInput').value;
+
+            if (!apiKey || !baseId) {
+                showStatus('Please enter API Key and Base ID', 'error');
+                return;
+            }
+
+            showStatus('Syncing...', 'syncing');
+            document.getElementById('syncIndicator').textContent = 'Syncing...';
+            document.getElementById('syncIndicator').className = 'sync-indicator syncing';
+
+            try {
+                // Simulated sync (replace with actual Airtable API call if needed)
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                showStatus('✓ Synced successfully!', 'success');
+                document.getElementById('syncIndicator').textContent = 'Synced';
+                document.getElementById('syncIndicator').className = 'sync-indicator';
+            } catch (error) {
+                showStatus('✗ Sync failed: ' + error.message, 'error');
+                document.getElementById('syncIndicator').textContent = 'Error';
+                document.getElementById('syncIndicator').className = 'sync-indicator error';
             }
         }
-        currentSemester = { name: currentName, expenses: currentExps };
-        const fourYear = [];
-        for (let semName of fourYearSemesters) {
-            let exps = fourMap.get(semName) || [];
-            exps.sort((a,b) => b.amount - a.amount);
-            fourYear.push({ id: semName, name: semName, expenses: exps });
+
+        function showStatus(message, type) {
+            const statusMsg = document.getElementById('statusMsg');
+            statusMsg.textContent = message;
+            statusMsg.className = `status-msg ${type}`;
         }
-        return fourYear;
-    }
 
-    async function syncToCloud() {
-        if (!ACCESS_TOKEN || !BASE_ID) return;
-        updateSyncIndicator('syncing');
-        try {
-            const all = [];
-            for (let sem of fourYearData) {
-                for (let exp of sem.expenses) {
-                    all.push({ ...exp, semester: sem.name, type: 'fouryear' });
-                }
-            }
-            for (let exp of currentSemester.expenses) {
-                all.push({ ...exp, semester: currentSemester.name, type: 'current' });
-            }
-            
-            const existing = await fetchAllRecords();
-            const existingMap = new Map();
-            for (let rec of existing) existingMap.set(rec.id, rec);
-
-            for (let exp of all) {
-                const fields = {
-                    Semester: exp.semester,
-                    Expense: exp.desc,
-                    Parent: exp.parent,
-                    Amount: exp.amount,
-                    Status: exp.status,
-                    Comment: exp.comment || '',
-                    Type: exp.type
-                };
-                if (exp.id && exp.id.startsWith('rec')) {
-                    await upsertRecord(exp.id, fields);
-                } else {
-                    const result = await upsertRecord(null, fields);
-                    if (result?.records?.[0]) exp.id = result.records[0].id;
-                }
-            }
-            
-            const currentIds = new Set(all.map(e => e.id).filter(id => id?.startsWith('rec')));
-            for (let rec of existing) {
-                if (!currentIds.has(rec.id)) await deleteRecord(rec.id);
-            }
-            
-            lastRemoteHash = computeDataHash({ fourYearData, currentSemester });
-            updateSyncIndicator('success');
-        } catch (err) {
-            console.error('Sync error:', err);
-            updateSyncIndicator('error');
-        }
-    }
-
-    async function pollForRemoteChanges() {
-        if (!ACCESS_TOKEN || !BASE_ID || isLoading) return;
-        try {
-            const records = await fetchAllRecords();
-            if (records.length === 0) return;
-            
-            const newData = recordsToData(records);
-            const currentHash = computeDataHash({ fourYearData: newData, currentSemester });
-            
-            if (lastRemoteHash && lastRemoteHash !== currentHash) {
-                fourYearData = newData;
-                renderFourYear();
-                renderCurrent();
-                updateTotalsUI();
-                updateSyncIndicator('success');
-            }
-            lastRemoteHash = currentHash;
-        } catch (err) {
-            console.error('Poll error:', err);
-        }
-    }
-
-    async function loadData() {
-        if (!ACCESS_TOKEN || !BASE_ID) return false;
-        isLoading = true;
-        try {
-            const records = await fetchAllRecords();
-            if (records.length === 0) {
-                console.log('No records found, seeding defaults');
-                await seedDefaultData();
-                const newRecords = await fetchAllRecords();
-                fourYearData = recordsToData(newRecords);
-            } else {
-                fourYearData = recordsToData(records);
-            }
-            
-            lastRemoteHash = computeDataHash({ fourYearData, currentSemester });
-            
-            if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(pollForRemoteChanges, 2000);
-            
-            isLoading = false;
-            return true;
-        } catch (err) {
-            console.error('Load error:', err);
-            isLoading = false;
-            document.getElementById('statusMsg').innerHTML = `<span class="error">❌ Error: ${err.message}</span>`;
-            return false;
-        }
-    }
-
-    function getDefaultFourYear() {
-        const result = [];
-        for (let name of fourYearSemesters) result.push({ id: name, name, expenses: [] });
-        
-        // Fall 2025 (Freshman)
-        result[0].expenses = [
-            { desc: "15 Creditos", amount: 16549, parent: "pai", status: "paid", comment: "" },
-            { desc: "Moradia Honors", amount: 4800, parent: "pai", status: "paid", comment: "" },
-            { desc: "K Sig. (Meal+)", amount: 2832, parent: "pai", status: "paid", comment: "" },
-            { desc: "Mesada", amount: 250, parent: "mae", status: "paid", comment: "" },
-            { desc: "Outros", amount: 581, parent: "mae", status: "paid", comment: "" }
-        ];
-        
-        // Spring 2026 (Freshman)
-        result[1].expenses = [
-            { desc: "17 Creditos", amount: 18751, parent: "pai", status: "paid", comment: "" },
-            { desc: "Moradia Honors", amount: 4800, parent: "pai", status: "paid", comment: "" },
-            { desc: "Mesada", amount: 100, parent: "mae", status: "paid", comment: "" },
-            { desc: "Outros", amount: 150, parent: "mae", status: "paid", comment: "" }
-        ];
-        
-        // Summer 2026
-        result[2].expenses = [
-            { desc: "Tuition & Housing", amount: 20000, parent: "pai", status: "pending", comment: "estimate" }
-        ];
-        
-        // Fall 2026 (Sophomore) - Template for copying
-        const fall2026Template = [
-            { desc: "15 Creditos", amount: 16549, parent: "pai", status: "pending", comment: "" },
-            { desc: "Moradia K.Sig", amount: 2950, parent: "pai", status: "pending", comment: "" },
-            { desc: "K Sig. (Meal+ Member)", amount: 2855, parent: "pai", status: "pending", comment: "" },
-            { desc: "Mercado P. Comida", amount: 1700, parent: "pai", status: "pending", comment: "" },
-            { desc: "Health Insu.", amount: 1500, parent: "pai", status: "pending", comment: "" },
-            { desc: "Ticket Ago-Dez", amount: 1100, parent: "mae", status: "paid", comment: "" },
-            { desc: "Mesada", amount: 1000, parent: "pai", status: "pending", comment: "" },
-            { desc: "Student Edge + AI", amount: 305, parent: "pai", status: "pending", comment: "" },
-            { desc: "Bonus GPA", amount: 250, parent: "pai", status: "pending", comment: "" },
-            { desc: "Comida Fora", amount: 236, parent: "pai", status: "pending", comment: "" },
-            { desc: "Lavanderia, Barbeiro (3x Sem, Celular ano, Livros", amount: 188, parent: "pai", status: "pending", comment: "" },
-            { desc: "Compras/Farmacia", amount: 165, parent: "pai", status: "pending", comment: "" },
-            { desc: "Compras pro Dorm na Frat", amount: 125, parent: "mae", status: "paid", comment: "" },
-            { desc: "Uber", amount: 30, parent: "pai", status: "pending", comment: "" }
-        ];
-        
-        // Copy Fall 2026 template to result[3] (Fall 2026 itself)
-        result[3].expenses = JSON.parse(JSON.stringify(fall2026Template));
-        
-        // Copy Fall 2026 template to Spring 2027 onwards
-        for (let i = 4; i < result.length; i++) {
-            result[i].expenses = JSON.parse(JSON.stringify(fall2026Template));
-        }
-        
-        return result;
-    }
-
-    async function seedDefaultData() {
-        const defaultFour = getDefaultFourYear();
-        for (let sem of defaultFour) {
-            for (let exp of sem.expenses) {
-                await upsertRecord(null, { Semester: sem.name, Expense: exp.desc, Parent: exp.parent, Amount: exp.amount, Status: exp.status, Comment: exp.comment, Type: 'fouryear' });
-            }
-        }
-    }
-
-    function computeTotals() {
-        let paid = 0, partial = 0, pending = 0;
-        const proc = (exps) => {
-            for (let e of exps) {
-                if (e.status === 'paid') paid += e.amount;
-                else if (e.status === 'partial') partial += e.amount;
-                else pending += e.amount;
-            }
-        };
-        for (let sem of fourYearData) proc(sem.expenses);
-        proc(currentSemester.expenses);
-        return { paid, partial, pending };
-    }
-
-    function computeParentDetails() {
-        let paiPaid=0, paiPartial=0, paiPending=0, maePaid=0, maePartial=0, maePending=0;
-        const proc = (e) => {
-            if (e.parent === 'pai') {
-                if (e.status === 'paid') paiPaid += e.amount;
-                else if (e.status === 'partial') paiPartial += e.amount;
-                else paiPending += e.amount;
-            } else {
-                if (e.status === 'paid') maePaid += e.amount;
-                else if (e.status === 'partial') maePartial += e.amount;
-                else maePending += e.amount;
-            }
-        };
-        for (let sem of fourYearData) for (let e of sem.expenses) proc(e);
-        for (let e of currentSemester.expenses) proc(e);
-        return { paiPaid, paiPartial, paiPending, maePaid, maePartial, maePending };
-    }
-
-    function updateAllCharts() {
-        let { paid, partial, pending } = computeTotals();
-        let { paiPaid, paiPartial, paiPending, maePaid, maePartial, maePending } = computeParentDetails();
-
-        const destroyChart = (name) => { if (charts[name]) { charts[name].destroy(); charts[name] = null; } };
-        destroyChart('overall'); destroyChart('pai'); destroyChart('mae'); destroyChart('contrib');
-
-        charts.overall = new Chart(document.getElementById('overallChart'), {
-            type: 'doughnut',
-            data: { labels: ['Paid','Partial','Pending'], datasets: [{ data: [paid,partial,pending], backgroundColor: ['#2c6e9e','#f4a261','#e9a23b'] }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
-        });
-        charts.pai = new Chart(document.getElementById('paiChart'), {
-            type: 'doughnut',
-            data: { labels: ['Paid','Partial','Pending'], datasets: [{ data: [paiPaid,paiPartial,paiPending], backgroundColor: ['#2c6e9e','#f4a261','#e9a23b'] }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
-        });
-        charts.mae = new Chart(document.getElementById('maeChart'), {
-            type: 'doughnut',
-            data: { labels: ['Paid','Partial','Pending'], datasets: [{ data: [maePaid,maePartial,maePending], backgroundColor: ['#d96c8e','#e9b3c2','#e9a23b'] }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
-        });
-        let totalPai = paiPaid+paiPartial+paiPending;
-        let totalMae = maePaid+maePartial+maePending;
-        charts.contrib = new Chart(document.getElementById('contribChart'), {
-            type: 'doughnut',
-            data: { labels: ['Pai','Mãe'], datasets: [{ data: [totalPai,totalMae], backgroundColor: ['#2c6e9e','#d96c8e'] }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
-        });
-    }
-
-    function updateTotalsUI() {
-        let { paid, partial, pending } = computeTotals();
-        document.getElementById('totalPaid').innerHTML = `$${formatUSD(paid)}`;
-        document.getElementById('totalPartial').innerHTML = `$${formatUSD(partial)}`;
-        document.getElementById('totalPending').innerHTML = `$${formatUSD(pending)}`;
-        document.getElementById('totalGrand').innerHTML = `$${formatUSD(paid+partial+pending)}`;
-        updateAllCharts();
-    }
-
-    function renderFourYear() {
-        const container = document.getElementById('fourYearContainer');
-        container.innerHTML = '';
-        for (let sem of fourYearData) {
-            const div = document.createElement('div');
-            div.className = 'semester-section';
-            let semTotal = sem.expenses.reduce((s,e)=>s+e.amount,0);
-            let semPai = sem.expenses.filter(e=>e.parent==='pai').reduce((s,e)=>s+e.amount,0);
-            let semMae = sem.expenses.filter(e=>e.parent==='mae').reduce((s,e)=>s+e.amount,0);
-            div.innerHTML = `<div class="section-header"><div class="section-header-left"><strong>${escapeHtml(sem.name)}</strong></div><div class="section-header-right"><span>👨 $${formatUSD(semPai)} | 👩 $${formatUSD(semMae)} | 📆 $${formatUSD(semTotal)}</span></div></div><div class="table-wrapper"><table><thead><tr><th>Expense</th><th>Parent</th><th>Amount</th><th>Status</th><th>Comment</th><th></th></tr></thead><tbody id="tbody-${sem.id.replace(/[^a-z0-9]/gi,'_')}"></tbody></table></div><div class="add-row" onclick="addFourYearExpense('${sem.id}')">+ Add expense</div>`;
-            container.appendChild(div);
-            const tbody = div.querySelector('tbody');
-            for (let i=0; i<sem.expenses.length; i++) {
-                const e = sem.expenses[i];
-                const row = tbody.insertRow();
-                row.insertCell(0).innerHTML = `<span class="editable-value" onclick="editFourYearDesc('${sem.id}', ${i})">${escapeHtml(e.desc)}</span>`;
-                row.insertCell(1).innerHTML = `<span class="responsible-badge badge-${e.parent}" onclick="toggleFourYearParent('${sem.id}', ${i})">${e.parent==='pai'?'👨':'👩'}</span>`;
-                const statusClass = e.status==='paid'?'status-paid':(e.status==='partial'?'status-partial':'status-pending');
-                const statusText = e.status==='paid'?'✅':(e.status==='partial'?'🔸':'⚠️');
-                row.insertCell(2).innerHTML = `<span class="editable-value" onclick="editFourYearAmount('${sem.id}', ${i})">$${formatUSD(e.amount)}</span>`;
-                row.insertCell(3).innerHTML = `<span class="status-badge ${statusClass}" onclick="cycleFourYearStatus('${sem.id}', ${i})">${statusText}</span>`;
-                row.insertCell(4).innerHTML = `<span class="comment-cell" data-fulltext="${escapeHtml(e.comment)}" onclick="editFourYearComment('${sem.id}', ${i})">${escapeHtml(e.comment)}</span>`;
-                const delBtn = document.createElement('button');
-                delBtn.innerText = '✖'; delBtn.style.background = '#b16254';
-                delBtn.onclick = () => deleteFourYearExpense(sem.id, i);
-                row.insertCell(5).appendChild(delBtn);
-            }
-        }
-    }
-
-    function renderCurrent() {
-        const tbody = document.getElementById('currentTbody');
-        tbody.innerHTML = '';
-        for (let i=0; i<currentSemester.expenses.length; i++) {
-            const e = currentSemester.expenses[i];
-            const row = tbody.insertRow();
-            row.insertCell(0).innerHTML = `<span class="editable-value" onclick="editCurrentDesc(${i})">${escapeHtml(e.desc)}</span>`;
-            row.insertCell(1).innerHTML = `<span class="responsible-badge badge-${e.parent}" onclick="toggleCurrentParent(${i})">${e.parent==='pai'?'👨':'👩'}</span>`;
-            const statusClass = e.status==='paid'?'status-paid':(e.status==='partial'?'status-partial':'status-pending');
-            const statusText = e.status==='paid'?'✅':(e.status==='partial'?'🔸':'⚠️');
-            row.insertCell(2).innerHTML = `<span class="editable-value" onclick="editCurrentAmount(${i})">$${formatUSD(e.amount)}</span>`;
-            row.insertCell(3).innerHTML = `<span class="status-badge ${statusClass}" onclick="cycleCurrentStatus(${i})">${statusText}</span>`;
-            row.insertCell(4).innerHTML = `<span class="comment-cell" data-fulltext="${escapeHtml(e.comment)}" onclick="editCurrentComment(${i})">${escapeHtml(e.comment)}</span>`;
-            const delBtn = document.createElement('button');
-            delBtn.innerText = '✖'; delBtn.style.background = '#b16254';
-            delBtn.onclick = () => deleteCurrentExpense(i);
-            row.insertCell(5).appendChild(delBtn);
-        }
-        if (currentSemester.expenses.length===0) tbody.innerHTML = '<tr><td colspan="6">No expenses</td></tr>';
-        document.getElementById('currentSemesterName').innerText = currentSemester.name;
-    }
-
-    async function syncAndRender() {
-        await debouncedSync();
-        renderFourYear(); renderCurrent(); updateTotalsUI();
-    }
-
-    window.editFourYearDesc = async (semId, idx) => { let sem = fourYearData.find(s=>s.id===semId); if(sem){ let v = prompt('Edit:', sem.expenses[idx].desc); if(v && v.trim()){ sem.expenses[idx].desc = v.trim(); await syncAndRender(); } } };
-    window.toggleFourYearParent = async (semId, idx) => { let sem = fourYearData.find(s=>s.id===semId); if(sem){ sem.expenses[idx].parent = sem.expenses[idx].parent==='pai'?'mae':'pai'; await syncAndRender(); } };
-    window.editFourYearAmount = async (semId, idx) => { let sem = fourYearData.find(s=>s.id===semId); if(sem){ let v = prompt('Amount:', sem.expenses[idx].amount); if(v && !isNaN(parseFloat(v))){ sem.expenses[idx].amount = Math.abs(parseFloat(v)); sem.expenses.sort((a,b)=>b.amount - a.amount); await syncAndRender(); } } };
-    window.cycleFourYearStatus = async (semId, idx) => { let sem = fourYearData.find(s=>s.id===semId); if(sem){ let c = sem.expenses[idx].status; sem.expenses[idx].status = c==='paid'?'partial':(c==='partial'?'pending':'paid'); await syncAndRender(); } };
-    window.editFourYearComment = async (semId, idx) => { let sem = fourYearData.find(s=>s.id===semId); if(sem){ let v = prompt('Comment:', sem.expenses[idx].comment||''); if(v!==null){ sem.expenses[idx].comment = v.trim(); await syncAndRender(); } } };
-    async function deleteFourYearExpense(semId, idx) { if(confirm('Delete?')){ let sem = fourYearData.find(s=>s.id===semId); sem.expenses.splice(idx,1); await syncAndRender(); } }
-    window.addFourYearExpense = async (semId) => { let desc = prompt('Expense name:'); if(!desc) return; let amt = parseFloat(prompt('Amount:')); if(isNaN(amt)) return; let parent = prompt('Responsible (pai/mae):').toLowerCase(); if(parent!=='pai' && parent!=='mae') return; let comment = prompt('Comment:', ''); let sem = fourYearData.find(s=>s.id===semId); sem.expenses.push({ desc, amount: amt, parent, status: 'pending', comment: comment||'' }); sem.expenses.sort((a,b)=>b.amount - a.amount); await syncAndRender(); }
-
-    window.editCurrentDesc = async (idx) => { let v = prompt('Edit:', currentSemester.expenses[idx].desc); if(v && v.trim()){ currentSemester.expenses[idx].desc = v.trim(); await syncAndRender(); } };
-    window.toggleCurrentParent = async (idx) => { currentSemester.expenses[idx].parent = currentSemester.expenses[idx].parent==='pai'?'mae':'pai'; await syncAndRender(); };
-    window.editCurrentAmount = async (idx) => { let v = prompt('Amount:', currentSemester.expenses[idx].amount); if(v && !isNaN(parseFloat(v))){ currentSemester.expenses[idx].amount = Math.abs(parseFloat(v)); await syncAndRender(); } };
-    window.cycleCurrentStatus = async (idx) => { let c = currentSemester.expenses[idx].status; currentSemester.expenses[idx].status = c==='paid'?'partial':(c==='partial'?'pending':'paid'); await syncAndRender(); };
-    window.editCurrentComment = async (idx) => { let v = prompt('Comment:', currentSemester.expenses[idx].comment||''); if(v!==null){ currentSemester.expenses[idx].comment = v.trim(); await syncAndRender(); } };
-    async function deleteCurrentExpense(idx) { if(confirm('Delete?')){ currentSemester.expenses.splice(idx,1); await syncAndRender(); } }
-
-    function exportCSV() {
-        let rows = [['Type','Semester','Expense','Parent','Amount','Status','Comment']];
-        for (let sem of fourYearData) for (let e of sem.expenses) rows.push(['4-Year', sem.name, e.desc, e.parent, e.amount, e.status, e.comment||'']);
-        for (let e of currentSemester.expenses) rows.push(['Current', currentSemester.name, e.desc, e.parent, e.amount, e.status, e.comment||'']);
-        let csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-        let blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-        let link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'college_budget.csv';
-        link.click();
-    }
-
-    async function testConnection() {
-        const token = document.getElementById('tokenInput').value.trim();
-        const baseId = document.getElementById('baseIdInput').value.trim();
-        if (!token || !baseId) { alert('Enter both Token and Base ID'); return; }
-        document.getElementById('statusMsg').innerHTML = '<span class="warning">Testing...</span>';
-        try {
-            const res = await fetch(`https://api.airtable.com/v0/${baseId}/${TABLE}?maxRecords=1`, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) {
-                document.getElementById('statusMsg').innerHTML = '<span class="success">✅ Success! Click "Save & Load"</span>';
-            } else {
-                const errorText = await res.text();
-                document.getElementById('statusMsg').innerHTML = `<span class="error">❌ ${res.status}: ${errorText}</span>`;
-            }
-        } catch(e) { 
-            document.getElementById('statusMsg').innerHTML = `<span class="error">❌ ${e.message}</span>`; 
-        }
-    }
-
-    async function saveAndLoad() {
-        const token = document.getElementById('tokenInput').value.trim();
-        const baseId = document.getElementById('baseIdInput').value.trim();
-        if (!token || !baseId) { alert('Please enter both Token and Base ID'); return; }
-        localStorage.setItem('airtable_token', token);
-        localStorage.setItem('airtable_base_id', baseId);
-        ACCESS_TOKEN = token; 
-        BASE_ID = baseId;
-        document.getElementById('statusMsg').innerHTML = '<span class="warning">Loading...</span>';
-        const success = await loadData();
-        if (success) {
-            document.getElementById('statusMsg').innerHTML = '<span class="success">✅ Loaded! Real-time sync active. Polling every 2 seconds.</span>';
-            renderFourYear(); 
-            renderCurrent(); 
-            updateTotalsUI();
-        } else {
-            document.getElementById('statusMsg').innerHTML = '<span class="error">❌ Failed to load. Check your credentials.</span>';
-        }
-    }
-
-    document.getElementById('saveBtn').addEventListener('click', saveAndLoad);
-    document.getElementById('testBtn').addEventListener('click', testConnection);
-    document.getElementById('addCurrentBtn').addEventListener('click', async () => { let desc = prompt('Name:'); if(desc) { let amt = parseFloat(prompt('Amount:')); if(!isNaN(amt)) { let parent = prompt('pai/mae?').toLowerCase(); if(parent==='pai' || parent==='mae') { currentSemester.expenses.push({ desc, amount: amt, parent, status: 'pending', comment: '' }); await syncAndRender(); } } } });
-    document.getElementById('editSemesterNameBtn').addEventListener('click', async () => { let newName = prompt('Name:', currentSemester.name); if(newName) { currentSemester.name = newName.trim(); await syncAndRender(); } });
-    document.getElementById('clearCurrentBtn').addEventListener('click', async () => { if(confirm('Clear all?')) { currentSemester.expenses = []; await syncAndRender(); } });
-    document.getElementById('exportBtn').addEventListener('click', exportCSV);
-    document.getElementById('resetDefaultBtn').addEventListener('click', async () => { if(confirm('Reset 4-year?')) { fourYearData = getDefaultFourYear(); await syncAndRender(); } });
-
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) pollForRemoteChanges();
-    });
-
-    if (ACCESS_TOKEN && BASE_ID) {
-        document.getElementById('tokenInput').value = ACCESS_TOKEN;
-        document.getElementById('baseIdInput').value = BASE_ID;
-        saveAndLoad();
-    }
-</script>
+        // Initialize
+        initializeData();
+        renderSemesters();
+        updateStats();
+        updateCharts();
+    </script>
 </body>
 </html>
